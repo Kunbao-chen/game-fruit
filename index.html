@@ -3,19 +3,16 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>水果大合併 - 經典物理引擎版</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <!-- 載入專業輕量 2D 物理引擎 Matter.js -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/matter-js/0.19.0/matter.min.js"></script>
+  <title>水果大合併 - 原生物理完美版</title>
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
-    
     * {
       box-sizing: border-box;
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
       margin: 0;
       padding: 0;
+      user-select: none;
+      -webkit-user-select: none;
     }
 
     html, body {
@@ -24,113 +21,261 @@
       height: 100dvh;
       background-color: #0c0a09;
       color: #f8fafc;
-      font-family: 'Press Start 2P', cursive, monospace;
-      user-select: none;
-      -webkit-user-select: none;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      align-items: center;
+      padding: 4px;
+    }
+
+    /* 頂部 HUD */
+    header {
+      width: 100%;
+      background-color: rgba(28, 25, 23, 0.95);
+      border-radius: 8px;
+      padding: 6px 12px;
+      border: 1px solid #292524;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      flex-shrink: 0;
+      z-index: 10;
+    }
+
+    .hud-group {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .hud-item {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .hud-label {
+      font-size: 9px;
+      color: #a8a29e;
+    }
+    .hud-value {
+      font-size: 13px;
+      font-weight: bold;
+      color: #fbbf24;
+    }
+
+    /* 主遊戲區域 */
+    main {
+      flex: 1;
+      width: 100%;
+      display: flex;
+      align-items: stretch;
+      gap: 4px;
+      margin: 4px 0;
+      position: relative;
+      min-height: 0;
       overflow: hidden;
     }
 
-    .neon-border {
-      box-shadow: 0 0 15px rgba(245, 158, 11, 0.4), inset 0 0 10px rgba(245, 158, 11, 0.15);
+    .side-panel {
+      width: 64px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      flex-shrink: 0;
+      z-index: 10;
     }
 
-    .btn-act:active {
+    .canvas-box {
+      flex: 1;
+      position: relative;
+      background-color: #0c0a09;
+      border-radius: 12px;
+      border: 2px solid rgba(245, 158, 11, 0.6);
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    canvas {
+      display: block;
+      background-color: #0c0a09;
+      border-radius: 8px;
+    }
+
+    /* 按鈕樣式與點擊回饋 */
+    .btn-ctrl {
+      background-color: #292524;
+      border: 2px solid #57534e;
+      border-radius: 12px;
+      color: #f5f5f4;
+      font-weight: bold;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      flex: 1;
+      transition: transform 0.05s ease, background-color 0.05s ease;
+    }
+    .btn-ctrl:active, .btn-ctrl.active {
       transform: scale(0.92);
       filter: brightness(1.3);
     }
+    .btn-ctrl-primary {
+      background-color: #b45309;
+      border-color: #f59e0b;
+      color: #fff;
+    }
+    .btn-ctrl-bomb {
+      background-color: #7f1d1d;
+      border-color: #ef4444;
+      color: #fff;
+    }
 
-    @keyframes bombGlow {
-      0%, 100% { box-shadow: 0 0 8px rgba(239, 68, 68, 0.6); }
-      50% { box-shadow: 0 0 18px rgba(239, 68, 68, 1); }
+    .btn-subtext {
+      font-size: 10px;
+      margin-top: 2px;
     }
-    .bomb-ready {
-      animation: bombGlow 1s infinite;
+
+    /* 底部選單按鈕區 */
+    footer {
+      width: 100%;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 6px;
+      height: 14vh;
+      max-height: 100px;
+      min-height: 70px;
+      flex-shrink: 0;
+      z-index: 10;
     }
+
+    /* 蓋版選單 */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      background-color: rgba(12, 10, 9, 0.95);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      z-index: 50;
+    }
+
+    .overlay-title {
+      font-size: 22px;
+      font-weight: bold;
+      color: #f59e0b;
+    }
+    .overlay-score {
+      font-size: 13px;
+      color: #d6d3d1;
+    }
+    .btn-start {
+      padding: 12px 32px;
+      background-color: #f59e0b;
+      color: #0c0a09;
+      font-size: 15px;
+      font-weight: bold;
+      border: none;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+      cursor: pointer;
+    }
+    .btn-start:active {
+      transform: scale(0.94);
+    }
+
+    .hidden { display: none !important; }
   </style>
 </head>
-<body class="flex flex-col justify-between items-center w-full h-full p-1">
+<body>
 
-  <!-- 1. 頂部狀態列 -->
-  <header class="w-full bg-stone-900/90 rounded-lg p-1.5 border border-stone-800 flex items-center justify-between text-[10px] shrink-0 z-10">
-    <div class="flex items-center gap-1.5">
-      <span class="text-[8px] text-stone-400">NEXT:</span>
-      <span id="nextFruitEmoji" class="text-lg">🍒</span>
+  <!-- 1. 頂部 HUD -->
+  <header>
+    <div style="display: flex; align-items: center; gap: 6px;">
+      <span style="color: #a8a29e; font-size: 10px;">NEXT:</span>
+      <span id="nextFruitEmoji" style="font-size: 18px;">🍒</span>
     </div>
 
-    <div class="flex items-center gap-4">
-      <div class="flex flex-col items-center">
-        <div class="text-[7px] text-stone-400">SCORE</div>
-        <div id="score" class="text-xs text-amber-400 font-bold">0</div>
+    <div class="hud-group">
+      <div class="hud-item">
+        <span class="hud-label">SCORE</span>
+        <span id="score" class="hud-value">0</span>
       </div>
-      <div class="flex flex-col items-center">
-        <div class="text-[7px] text-red-400">BOMB</div>
-        <div id="bombCountHUD" class="text-xs text-red-500 font-bold">1</div>
+      <div class="hud-item">
+        <span class="hud-label" style="color:#ef4444;">BOMB</span>
+        <span id="bombCountHUD" class="hud-value" style="color:#ef4444;">1</span>
       </div>
     </div>
 
-    <div class="text-[8px] text-amber-500 font-sans font-bold">
+    <div style="color: #f59e0b; font-weight: bold; font-size: 11px;">
       🍉 合成大西瓜
     </div>
   </header>
 
-  <!-- 2. 中間草圖配置：左（↓/←）| 中央物理世界畫布 | 右（🎯/→）[cite: 4, 5] -->
-  <main id="mainContainer" class="flex-1 w-full flex items-stretch gap-1 my-1 relative min-h-0 overflow-hidden">
+  <!-- 2. 中間草圖配置：左（↓/←）| 中央遊戲區 | 右（🎯/→）[cite: 4, 5] -->
+  <main id="mainContainer">
     
-    <!-- 左側按鈕區[cite: 4, 5] -->
-    <div class="w-16 sm:w-20 flex flex-col gap-1 shrink-0 z-10">
-      <button id="btnDown" class="flex-1 bg-stone-800 border-2 border-stone-600 rounded-xl text-2xl font-bold flex flex-col items-center justify-center btn-act">
-        <span>↓</span>
-        <span class="text-[8px] font-sans text-amber-400 mt-1">投擲</span>
+    <!-- 左側按鈕[cite: 4, 5] -->
+    <div class="side-panel">
+      <button id="btnDown" class="btn-ctrl">
+        <span style="font-size: 22px;">↓</span>
+        <span class="btn-subtext" style="color: #fbbf24;">投擲</span>
       </button>
-      <button id="btnLeft" class="flex-1 bg-stone-800 border-2 border-stone-600 rounded-xl text-2xl font-bold flex flex-col items-center justify-center btn-act">
-        <span>←</span>
-        <span class="text-[8px] font-sans text-stone-400 mt-1">靠左</span>
+      <button id="btnLeft" class="btn-ctrl">
+        <span style="font-size: 22px;">←</span>
+        <span class="btn-subtext" style="color: #a8a29e;">靠左</span>
       </button>
     </div>
 
-    <!-- 中央水果物理畫布容器[cite: 4, 5] -->
-    <div id="canvasContainer" class="flex-1 relative bg-stone-950 rounded-xl border-2 border-amber-500/60 neon-border flex items-center justify-center overflow-hidden">
-      <canvas id="fruitCanvas" class="bg-stone-950 rounded-lg block"></canvas>
+    <!-- 中央物理畫布[cite: 4, 5] -->
+    <div id="canvasContainer" class="canvas-box">
+      <canvas id="fruitCanvas"></canvas>
       
       <!-- 蓋版選單[cite: 5] -->
-      <div id="overlay" class="absolute inset-0 bg-stone-950/95 rounded-xl flex flex-col items-center justify-center p-4 gap-4 z-50">
-        <h2 id="overlayTitle" class="text-xl text-amber-400 font-bold text-center">水果大合併</h2>
-        <p id="finalScore" class="text-xs text-stone-300 font-sans hidden">最終得分: 0</p>
-        <button id="startBtn" class="px-8 py-4 bg-amber-500 hover:bg-amber-400 active:scale-95 text-stone-950 text-sm font-bold rounded-xl font-sans shadow-lg cursor-pointer">
-          開始遊戲
-        </button>
+      <div id="overlay">
+        <div id="overlayTitle" class="overlay-title">水果大合併</div>
+        <div id="finalScore" class="overlay-score hidden">最終得分: 0</div>
+        <button id="startBtn" class="btn-start">開始遊戲</button>
       </div>
     </div>
 
-    <!-- 右側按鈕區[cite: 4, 5] -->
-    <div class="w-16 sm:w-20 flex flex-col gap-1 shrink-0 z-10">
-      <button id="btnDropRight" class="flex-1 bg-amber-700 border-2 border-amber-500 rounded-xl text-2xl font-bold text-amber-100 flex flex-col items-center justify-center btn-act shadow-md">
-        <span>🎯</span>
-        <span class="text-[8px] font-sans text-amber-200 mt-1">發射</span>
+    <!-- 右側按鈕[cite: 4, 5] -->
+    <div class="side-panel">
+      <button id="btnDropRight" class="btn-ctrl btn-ctrl-primary">
+        <span style="font-size: 20px;">🎯</span>
+        <span class="btn-subtext" style="color: #fde68a;">發射</span>
       </button>
-      <button id="btnRight" class="flex-1 bg-stone-800 border-2 border-stone-600 rounded-xl text-2xl font-bold flex flex-col items-center justify-center btn-act">
-        <span>→</span>
-        <span class="text-[8px] font-sans text-stone-400 mt-1">靠右</span>
+      <button id="btnRight" class="btn-ctrl">
+        <span style="font-size: 22px;">→</span>
+        <span class="btn-subtext" style="color: #a8a29e;">靠右</span>
       </button>
     </div>
 
   </main>
 
-  <!-- 3. 底部功能鍵：Pause / Restart / 炸彈[cite: 4, 5] -->
-  <footer class="w-full grid grid-cols-3 gap-1.5 items-stretch shrink-0 pb-1 h-[14vh] max-h-[110px] min-h-[75px] z-10">
-    <button id="btnPause" class="bg-stone-800 border-2 border-stone-600 rounded-xl text-xl font-bold flex flex-col items-center justify-center btn-act text-stone-200">
-      <span>⏸️</span>
-      <span class="text-[8px] font-sans text-stone-400 mt-0.5">Pause</span>
+  <!-- 3. 底部按鈕：Pause / Restart / 炸彈[cite: 4, 5] -->
+  <footer>
+    <button id="btnPause" class="btn-ctrl">
+      <span style="font-size: 18px;">⏸️</span>
+      <span class="btn-subtext" style="color: #a8a29e;">Pause</span>
     </button>
 
-    <button id="btnRestart" class="bg-stone-800 border-2 border-stone-600 rounded-xl text-sm font-bold flex flex-col items-center justify-center btn-act text-amber-300">
-      <span class="text-lg">🔄</span>
-      <span class="text-[9px] font-sans mt-0.5">Restart</span>
+    <button id="btnRestart" class="btn-ctrl">
+      <span style="font-size: 18px;">🔄</span>
+      <span class="btn-subtext" style="color: #fbbf24;">Restart</span>
     </button>
 
-    <button id="btnBomb" class="bg-red-900/80 border-2 border-red-500 rounded-xl text-white font-bold flex flex-col items-center justify-center btn-act relative">
-      <span class="text-xl">💣</span>
-      <span id="btnBombText" class="text-[9px] font-sans text-red-300 mt-0.5">炸彈 (1)</span>
+    <button id="btnBomb" class="btn-ctrl btn-ctrl-bomb">
+      <span style="font-size: 18px;">💣</span>
+      <span id="btnBombText" class="btn-subtext" style="color: #fca5a5;">炸彈 (1)</span>
     </button>
   </footer>
 
@@ -141,7 +286,6 @@
     var scoreEl = document.getElementById('score');
     var bombCountHUD = document.getElementById('bombCountHUD');
     var btnBombText = document.getElementById('btnBombText');
-    var btnBomb = document.getElementById('btnBomb');
     var nextFruitEmoji = document.getElementById('nextFruitEmoji');
 
     var overlay = document.getElementById('overlay');
@@ -149,7 +293,7 @@
     var finalScore = document.getElementById('finalScore');
     var startBtn = document.getElementById('startBtn');
 
-    // 7種精簡水果定義 (幾何與得分設定)
+    // 7種精簡水果層級定義
     var FRUITS = [
       { level: 0, emoji: '🍒', radius: 18, score: 2 },
       { level: 1, emoji: '🍓', radius: 25, score: 6 },
@@ -160,16 +304,7 @@
       { level: 6, emoji: '🍉', radius: 78, score: 254 }
     ];
 
-    // Matter.js 物理引擎元件
-    var Engine = Matter.Engine,
-        World = Matter.World,
-        Bodies = Matter.Bodies,
-        Body = Matter.Body,
-        Events = Matter.Events;
-
-    var engine, world;
-    var ground, leftWall, rightWall;
-
+    var fruitsOnBoard = [];
     var score = 0;
     var bombInventory = 1;
     var gameOver = false, isPaused = false, gameStarted = false;
@@ -184,28 +319,11 @@
       if (!container) return;
       canvas.width = container.clientWidth - 8;
       canvas.height = container.clientHeight - 8;
-
       if (currentFruitX === 0) currentFruitX = canvas.width / 2;
-
-      // 當縮放視窗時重新調整物理世界邊界
-      if (engine) {
-        setupWorldBounds();
-      }
     }
     window.addEventListener('resize', resizeCanvas);
 
-    function setupWorldBounds() {
-      if (ground) World.remove(world, [ground, leftWall, rightWall]);
-
-      var wallThickness = 100;
-      // 建立地板與左右牆壁物理剛體
-      ground = Bodies.rectangle(canvas.width / 2, canvas.height + wallThickness / 2 - 5, canvas.width * 2, wallThickness, { isStatic: true, restitution: 0.2 });
-      leftWall = Bodies.rectangle(-wallThickness / 2, canvas.height / 2, wallThickness, canvas.height * 2, { isStatic: true, restitution: 0.2 });
-      rightWall = Bodies.rectangle(canvas.width + wallThickness / 2, canvas.height / 2, wallThickness, canvas.height * 2, { isStatic: true, restitution: 0.2 });
-
-      World.add(world, [ground, leftWall, rightWall]);
-    }
-
+    // Web Audio 音效引擎
     var audioCtx = null;
     function initAudio() {
       try {
@@ -230,66 +348,16 @@
       } catch(e){}
     }
 
-    // 初始化 Matter.js 物理引擎
-    function initPhysicsEngine() {
-      engine = Engine.create({
-        enableSleeping: false
-      });
-      world = engine.world;
-      engine.world.gravity.y = 0.9; // 設為標準地心重力
-
-      setupWorldBounds();
-
-      // 監聽物理碰撞事件（同種類水果接觸併合）
-      Events.on(engine, 'collisionStart', function(event) {
-        var pairs = event.pairs;
-        for (var i = 0; i < pairs.length; i++) {
-          var pair = pairs[i];
-          var bodyA = pair.bodyA;
-          var bodyB = pair.bodyB;
-
-          if (bodyA.fruitLevel !== undefined && bodyB.fruitLevel !== undefined) {
-            // 🍓 兩個相同等級的水果相撞 ➔ 合併升級！
-            if (bodyA.fruitLevel === bodyB.fruitLevel && !bodyA.isMarkedForDelete && !bodyB.isMarkedForDelete) {
-              if (bodyA.fruitLevel < FRUITS.length - 1) {
-                bodyA.isMarkedForDelete = true;
-                bodyB.isMarkedForDelete = true;
-
-                var newLevel = bodyA.fruitLevel + 1;
-                var newX = (bodyA.position.x + bodyB.position.x) / 2;
-                var newY = (bodyA.position.y + bodyB.position.y) / 2;
-
-                score += FRUITS[newLevel].score;
-                playPopSound(newLevel);
-
-                if (newLevel >= 4) bombInventory++; // 獎勵炸彈
-
-                // 移除舊水果並生出升級後的新水果
-                setTimeout((function(bA, bB, nx, ny, nl) {
-                  return function() {
-                    World.remove(world, [bA, bB]);
-                    spawnPhysicalFruit(nx, ny, nl);
-                    updateUI();
-                  };
-                })(bodyA, bodyB, newX, newY, newLevel), 10);
-              }
-            }
-          }
-        }
-      });
-    }
-
-    // 在物理世界中創建一顆圓形水果剛體
-    function spawnPhysicalFruit(x, y, level) {
-      var r = FRUITS[level].radius;
-      var fruitBody = Bodies.circle(x, y, r, {
-        restitution: 0.28, // 適當反彈係數
-        friction: 0.1,    // 滾動摩擦力
-        density: 0.002
-      });
-      fruitBody.fruitLevel = level;
-      World.add(world, fruitBody);
-      return fruitBody;
+    // 水果物件類別
+    function FruitItem(x, y, level) {
+      this.x = x;
+      this.y = y;
+      this.vx = (Math.random() - 0.5) * 0.2; // 微小微震，防止死卡
+      this.vy = 0;
+      this.level = level;
+      this.radius = FRUITS[level].radius;
+      this.emoji = FRUITS[level].emoji;
+      this.isMerged = false;
     }
 
     function spawnNextFruit() {
@@ -303,4 +371,271 @@
       if (!gameStarted || isPaused || gameOver || !canDrop) return;
       var step = 15;
       var r = FRUITS[currentFruitType].radius;
-      currentFruitX += dir
+      currentFruitX += dir * step;
+      if (currentFruitX < r) currentFruitX = r;
+      if (currentFruitX > canvas.width - r) currentFruitX = canvas.width - r;
+    }
+
+    function dropFruit() {
+      if (!gameStarted || isPaused || gameOver || !canDrop) return;
+      canDrop = false;
+      var newFruit = new FruitItem(currentFruitX, 40, currentFruitType);
+      fruitsOnBoard.push(newFruit);
+      playPopSound(1);
+
+      setTimeout(function() {
+        if (!gameOver) spawnNextFruit();
+      }, 400);
+    }
+
+    function activateBomb() {
+      if (bombInventory <= 0 || !gameStarted || isPaused || gameOver) return;
+      bombInventory--;
+      playPopSound(8);
+
+      // 炸彈消除底部最密的 3 個水果
+      fruitsOnBoard.sort(function(a, b){ return b.y - a.y; });
+      fruitsOnBoard.splice(0, Math.min(3, fruitsOnBoard.length));
+
+      updateUI();
+    }
+
+    // 🍒 手寫超流暢 2D 物理碰撞與滾動堆疊演算法
+    function updatePhysics() {
+      var gravity = 0.45;
+      var bounce = 0.22;
+      var friction = 0.96;
+
+      // 1. 重力與邊界限制
+      for (var i = 0; i < fruitsOnBoard.length; i++) {
+        var f = fruitsOnBoard[i];
+        f.vy += gravity;
+        f.x += f.vx;
+        f.y += f.vy;
+        f.vx *= friction;
+
+        // 左右牆邊界反彈
+        if (f.x - f.radius < 0) { f.x = f.radius; f.vx *= -bounce; }
+        if (f.x + f.radius > canvas.width) { f.x = canvas.width - f.radius; f.vx *= -bounce; }
+        // 底部反彈
+        if (f.y + f.radius > canvas.height) { 
+          f.y = canvas.height - f.radius; 
+          f.vy *= -bounce; 
+          f.vx *= 0.8;
+        }
+      }
+
+      // 2. 水果兩兩圓形碰撞、彈開與滾動
+      for (var i = 0; i < fruitsOnBoard.length; i++) {
+        for (var j = i + 1; j < fruitsOnBoard.length; j++) {
+          var f1 = fruitsOnBoard[i];
+          var f2 = fruitsOnBoard[j];
+
+          if (f1.isMerged || f2.isMerged) continue;
+
+          var dx = f2.x - f1.x;
+          var dy = f2.y - f1.y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+          var minDist = f1.radius + f2.radius;
+
+          if (dist < minDist) {
+            var overlap = minDist - dist;
+            var nx = dx / (dist || 1);
+            var ny = dy / (dist || 1);
+
+            // 位置分離推開（防止重疊卡死）
+            f1.x -= nx * overlap * 0.5;
+            f1.y -= ny * overlap * 0.5;
+            f2.x += nx * overlap * 0.5;
+            f2.y += ny * overlap * 0.5;
+
+            // 自然滾動擠壓速度分量
+            f1.vx -= nx * 0.1;
+            f1.vy -= ny * 0.1;
+            f2.vx += nx * 0.1;
+            f2.vy += ny * 0.1;
+
+            // 🍓 相同水果碰撞 ➔ 觸發合併升級！
+            if (f1.level === f2.level && f1.level < FRUITS.length - 1) {
+              f1.isMerged = true;
+              f2.isMerged = true;
+
+              var newLevel = f1.level + 1;
+              var newX = (f1.x + f2.x) / 2;
+              var newY = (f1.y + f2.y) / 2;
+
+              score += FRUITS[newLevel].score;
+              playPopSound(newLevel);
+
+              if (newLevel >= 4) bombInventory++;
+
+              (function(nx, ny, nl) {
+                setTimeout(function() {
+                  fruitsOnBoard = fruitsOnBoard.filter(function(item){ return !item.isMerged; });
+                  fruitsOnBoard.push(new FruitItem(nx, ny, nl));
+                  updateUI();
+                }, 20);
+              })(newX, newY, newLevel);
+            }
+          }
+        }
+      }
+
+      // 3. 溢出頂部警告判定 (Game Over)
+      for (var k = 0; k < fruitsOnBoard.length; k++) {
+        var fk = fruitsOnBoard[k];
+        if (fk.y - fk.radius < 65 && Math.abs(fk.vy) < 0.1 && !canDrop) {
+          gameOver = true;
+          showOverlay('遊戲結束');
+          break;
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // 頂部警戒線
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.4)';
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(0, 65);
+      ctx.lineTo(canvas.width, 65);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // 預備發射的水果
+      if (canDrop && gameStarted && !isPaused && !gameOver) {
+        var currentRadius = FRUITS[currentFruitType].radius;
+        ctx.font = (currentRadius * 1.35) + 'px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(FRUITS[currentFruitType].emoji, currentFruitX, 35);
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.beginPath();
+        ctx.moveTo(currentFruitX, 35);
+        ctx.lineTo(currentFruitX, canvas.height);
+        ctx.stroke();
+      }
+
+      // 繪製容器內的水果
+      for (var i = 0; i < fruitsOnBoard.length; i++) {
+        var f = fruitsOnBoard[i];
+        ctx.font = (f.radius * 1.35) + 'px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(f.emoji, f.x, f.y);
+      }
+    }
+
+    function updateUI() {
+      scoreEl.innerText = score;
+      bombCountHUD.innerText = bombInventory;
+      btnBombText.innerText = '炸彈 (' + bombInventory + ')';
+    }
+
+    function gameLoop() {
+      if (gameStarted && !isPaused && !gameOver) {
+        updatePhysics();
+        draw();
+      }
+      requestAnimationFrame(gameLoop);
+    }
+
+    function handleStartGame() {
+      initAudio();
+      fruitsOnBoard = [];
+      score = 0;
+      bombInventory = 1;
+      gameOver = false;
+      isPaused = false;
+      gameStarted = true;
+      overlay.classList.add('hidden');
+      resizeCanvas();
+      nextFruitType = Math.floor(Math.random() * 3);
+      spawnNextFruit();
+      updateUI();
+    }
+
+    function togglePause() {
+      if (!gameStarted || gameOver) return;
+      isPaused = !isPaused;
+      if (isPaused) {
+        showOverlay('遊戲暫停');
+      } else {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    function showOverlay(title) {
+      overlayTitle.innerText = title;
+      finalScore.innerText = '最終得分: ' + score;
+      if (title !== '水果大合併') finalScore.classList.remove('hidden');
+      startBtn.innerText = title === '遊戲暫停' ? '繼續遊戲' : '開始遊戲';
+      overlay.classList.remove('hidden');
+    }
+
+    // 行動裝置觸控事件綁定
+    function bindButton(elementId, onClickAction, isContinuous) {
+      var btn = document.getElementById(elementId);
+      if (!btn) return;
+      var timer = null;
+      var repeatTimer = null;
+
+      function start(e) {
+        if (e && e.cancelable) e.preventDefault();
+        initAudio();
+        btn.classList.add('active');
+        onClickAction();
+
+        if (isContinuous) {
+          timer = setTimeout(function() {
+            repeatTimer = setInterval(onClickAction, 60);
+          }, 160);
+        }
+      }
+
+      function end(e) {
+        if (e && e.cancelable) e.preventDefault();
+        btn.classList.remove('active');
+        clearTimeout(timer);
+        clearInterval(repeatTimer);
+      }
+
+      btn.addEventListener('touchstart', start, { passive: false });
+      btn.addEventListener('touchend', end);
+      btn.addEventListener('touchcancel', end);
+
+      btn.addEventListener('mousedown', start);
+      btn.addEventListener('mouseup', end);
+      btn.addEventListener('mouseleave', end);
+    }
+
+    // 綁定草圖方向與按鈕[cite: 4, 5]
+    bindButton('btnLeft', function(){ moveCurrentFruit(-1); }, true);
+    bindButton('btnRight', function(){ moveCurrentFruit(1); }, true);
+    bindButton('btnDown', function(){ dropFruit(); }, false);
+    bindButton('btnDropRight', function(){ dropFruit(); }, false);
+
+    bindButton('btnPause', function(){ togglePause(); }, false);
+    bindButton('btnRestart', function(){ handleStartGame(); }, false);
+    bindButton('btnBomb', function(){ activateBomb(); }, false);
+
+    startBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (isPaused) togglePause();
+      else handleStartGame();
+    });
+    startBtn.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      if (isPaused) togglePause();
+      else handleStartGame();
+    });
+
+    resizeCanvas();
+    showOverlay('水果大合併');
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
