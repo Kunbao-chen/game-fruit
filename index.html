@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>水果大合併 (7種精簡版) - Suika Merge Game</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    
+    * {
+      box-sizing: border-box;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      margin: 0;
+      padding: 0;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      height: 100dvh;
+      background-color: #0c0a09;
+      color: #f8fafc;
+      font-family: 'Press Start 2P', cursive, monospace;
+      user-select: none;
+      -webkit-user-select: none;
+      overflow: hidden;
+    }
+
+    .neon-border {
+      box-shadow: 0 0 15px rgba(245, 158, 11, 0.4), inset 0 0 10px rgba(245, 158, 11, 0.15);
+    }
+
+    .btn-act:active {
+      transform: scale(0.92);
+      filter: brightness(1.3);
+    }
+  </style>
+</head>
+<body class="flex flex-col justify-between items-center w-full h-full p-1">
+
+  <!-- 1. 頂部狀態列 -->
+  <header class="w-full bg-stone-900/90 rounded-lg p-1.5 border border-stone-800 flex items-center justify-between text-[10px] shrink-0 z-10">
+    <div class="flex items-center gap-1.5">
+      <span class="text-[8px] text-stone-400">NEXT:</span>
+      <span id="nextFruitEmoji" class="text-lg">🍒</span>
+    </div>
+
+    <div class="flex items-center gap-4">
+      <div class="flex flex-col items-center">
+        <div class="text-[7px] text-stone-400">SCORE</div>
+        <div id="score" class="text-xs text-amber-400 font-bold">0</div>
+      </div>
+      <div class="flex flex-col items-center">
+        <div class="text-[7px] text-red-400">BOMB</div>
+        <div id="bombCountHUD" class="text-xs text-red-500 font-bold">1</div>
+      </div>
+    </div>
+
+    <div class="text-[8px] text-amber-500 font-sans font-bold">
+      🍉 合成大西瓜
+    </div>
+  </header>
+
+  <!-- 2. 中間草圖配置 -->
+  <main id="mainContainer" class="flex-1 w-full flex items-stretch gap-1 my-1 relative min-h-0 overflow-hidden">
+    
+    <!-- 左側按鈕區 -->
+    <div class="w-16 sm:w-20 flex flex-col gap-1 shrink-0 z-10">
+      <button id="btnDown" class="flex-1 bg-stone-800 border-2 border-stone-600 rounded-xl text-2xl font-bold flex flex-col items-center justify-center btn-act">
+        <span>↓</span>
+        <span class="text-[8px] font-sans text-amber-400 mt-1">投擲</span>
+      </button>
+      <button id="btnLeft" class="flex-1 bg-stone-800 border-2 border-stone-600 rounded-xl text-2xl font-bold flex flex-col items-center justify-center btn-act">
+        <span>←</span>
+        <span class="text-[8px] font-sans text-stone-400 mt-1">靠左</span>
+      </button>
+    </div>
+
+    <!-- 中央水果放置畫布 -->
+    <div id="canvasContainer" class="flex-1 relative bg-stone-950 rounded-xl border-2 border-amber-500/60 neon-border flex items-center justify-center overflow-hidden">
+      <canvas id="fruitCanvas" class="bg-stone-950 rounded-lg block"></canvas>
+      
+      <!-- 蓋版選單 -->
+      <div id="overlay" class="absolute inset-0 bg-stone-950/95 rounded-xl flex flex-col items-center justify-center p-4 gap-4 z-50">
+        <h2 id="overlayTitle" class="text-xl text-amber-400 font-bold text-center">水果大合併</h2>
+        <p id="finalScore" class="text-xs text-stone-300 font-sans hidden">最終得分: 0</p>
+        <button id="startBtn" class="px-8 py-4 bg-amber-500 hover:bg-amber-400 active:scale-95 text-stone-950 text-sm font-bold rounded-xl font-sans shadow-lg cursor-pointer">
+          開始遊戲
+        </button>
+      </div>
+    </div>
+
+    <!-- 右側按鈕區 -->
+    <div class="w-16 sm:w-20 flex flex-col gap-1 shrink-0 z-10">
+      <button id="btnDropRight" class="flex-1 bg-amber-700 border-2 border-amber-500 rounded-xl text-2xl font-bold text-amber-100 flex flex-col items-center justify-center btn-act shadow-md">
+        <span>🎯</span>
+        <span class="text-[8px] font-sans text-amber-200 mt-1">發射</span>
+      </button>
+      <button id="btnRight" class="flex-1 bg-stone-800 border-2 border-stone-600 rounded-xl text-2xl font-bold flex flex-col items-center justify-center btn-act">
+        <span>→</span>
+        <span class="text-[8px] font-sans text-stone-400 mt-1">靠右</span>
+      </button>
+    </div>
+
+  </main>
+
+  <!-- 3. 底部功能鍵 -->
+  <footer class="w-full grid grid-cols-3 gap-1.5 items-stretch shrink-0 pb-1 h-[14vh] max-h-[110px] min-h-[75px] z-10">
+    <button id="btnPause" class="bg-stone-800 border-2 border-stone-600 rounded-xl text-xl font-bold flex flex-col items-center justify-center btn-act text-stone-200">
+      <span>⏸️</span>
+      <span class="text-[8px] font-sans text-stone-400 mt-0.5">Pause</span>
+    </button>
+
+    <button id="btnRestart" class="bg-stone-800 border-2 border-stone-600 rounded-xl text-sm font-bold flex flex-col items-center justify-center btn-act text-amber-300">
+      <span class="text-lg">🔄</span>
+      <span class="text-[9px] font-sans mt-0.5">Restart</span>
+    </button>
+
+    <button id="btnBomb" class="bg-red-900/80 border-2 border-red-500 rounded-xl text-white font-bold flex flex-col items-center justify-center btn-act relative">
+      <span class="text-xl">💣</span>
+      <span id="btnBombText" class="text-[9px] font-sans text-red-300 mt-0.5">炸彈 (1)</span>
+    </button>
+  </footer>
+
+  <script>
+    var canvas = document.getElementById('fruitCanvas');
+    var ctx = canvas.getContext('2d');
+
+    var scoreEl = document.getElementById('score');
+    var bombCountHUD = document.getElementById('bombCountHUD');
+    var btnBombText = document.getElementById('btnBombText');
+    var nextFruitEmoji = document.getElementById('nextFruitEmoji');
+
+    var overlay = document.getElementById('overlay');
+    var overlayTitle = document.getElementById('overlayTitle');
+    var finalScore = document.getElementById('finalScore');
+    var startBtn = document.getElementById('startBtn');
+
+    // 🍓 控制在 7 種水果以內，半徑與分數梯度重新最佳化
+    var FRUITS = [
+      { level: 0, emoji: '🍒', radius: 18, score: 2 },
+      { level: 1, emoji: '🍓', radius: 26, score: 6 },
+      { level: 2, emoji: '🍇', radius: 36, score: 14 },
+      { level: 3, emoji: '🍊', radius: 48, score: 30 },
+      { level: 4, emoji: '🍎', radius: 60, score: 62 },
+      { level: 5, emoji: '🍑', radius: 74, score: 126 },
+      { level: 6, emoji: '🍉', radius: 90, score: 254 }
+    ];
+
+    var fruitsOnBoard = [];
+    var score = 0;
+    var bombInventory = 1;
+    var gameOver = false, isPaused = false, gameStarted = false;
+
+    var currentFruitX = 0;
+    var currentFruitType = 0;
+    var nextFruitType = 0;
+    var canDrop = true;
