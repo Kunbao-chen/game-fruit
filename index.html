@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>水果大合併 (7種精簡版) - Suika Merge Game</title>
+  <title>水果大合併 - 超順暢版</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
@@ -63,7 +63,7 @@
     </div>
   </header>
 
-  <!-- 2. 中間草圖配置 -->
+  <!-- 2. 中間草圖配置：左（↓/←）| 中央水果容器 | 右（投擲/→） -->
   <main id="mainContainer" class="flex-1 w-full flex items-stretch gap-1 my-1 relative min-h-0 overflow-hidden">
     
     <!-- 左側按鈕區 -->
@@ -138,15 +138,15 @@
     var finalScore = document.getElementById('finalScore');
     var startBtn = document.getElementById('startBtn');
 
-    // 🍓 控制在 7 種水果以內，半徑與分數梯度重新最佳化
+    // 7種水果定義 (輕量化半徑)
     var FRUITS = [
       { level: 0, emoji: '🍒', radius: 18, score: 2 },
-      { level: 1, emoji: '🍓', radius: 26, score: 6 },
-      { level: 2, emoji: '🍇', radius: 36, score: 14 },
-      { level: 3, emoji: '🍊', radius: 48, score: 30 },
-      { level: 4, emoji: '🍎', radius: 60, score: 62 },
-      { level: 5, emoji: '🍑', radius: 74, score: 126 },
-      { level: 6, emoji: '🍉', radius: 90, score: 254 }
+      { level: 1, emoji: '🍓', radius: 25, score: 6 },
+      { level: 2, emoji: '🍇', radius: 32, score: 14 },
+      { level: 3, emoji: '🍊', radius: 42, score: 30 },
+      { level: 4, emoji: '🍎', radius: 52, score: 62 },
+      { level: 5, emoji: '🍑', radius: 64, score: 126 },
+      { level: 6, emoji: '🍉', radius: 78, score: 254 }
     ];
 
     var fruitsOnBoard = [];
@@ -158,3 +158,315 @@
     var currentFruitType = 0;
     var nextFruitType = 0;
     var canDrop = true;
+
+    function resizeCanvas() {
+      var container = document.getElementById('canvasContainer');
+      if (!container) return;
+      canvas.width = container.clientWidth - 8;
+      canvas.height = container.clientHeight - 8;
+      if (currentFruitX === 0) currentFruitX = canvas.width / 2;
+    }
+    window.addEventListener('resize', resizeCanvas);
+
+    var audioCtx = null;
+    function initAudio() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+      } catch (e) {}
+    }
+
+    function playPopSound(pitch) {
+      if (!audioCtx) return;
+      try {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(250 + pitch * 80, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.06, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.12);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.12);
+      } catch(e){}
+    }
+
+    function FruitItem(x, y, level) {
+      this.x = x;
+      this.y = y;
+      this.vy = 0;
+      this.level = level;
+      this.radius = FRUITS[level].radius;
+      this.emoji = FRUITS[level].emoji;
+      this.isDropping = true;
+      this.isMerged = false;
+    }
+
+    function spawnNextFruit() {
+      currentFruitType = nextFruitType;
+      nextFruitType = Math.floor(Math.random() * 3);
+      nextFruitEmoji.innerText = FRUITS[nextFruitType].emoji;
+      canDrop = true;
+    }
+
+    function moveCurrentFruit(dir) {
+      if (!gameStarted || isPaused || gameOver || !canDrop) return;
+      var step = 15;
+      var r = FRUITS[currentFruitType].radius;
+      currentFruitX += dir * step;
+      if (currentFruitX < r) currentFruitX = r;
+      if (currentFruitX > canvas.width - r) currentFruitX = canvas.width - r;
+    }
+
+    function dropFruit() {
+      if (!gameStarted || isPaused || gameOver || !canDrop) return;
+      canDrop = false;
+      var newFruit = new FruitItem(currentFruitX, 50, currentFruitType);
+      fruitsOnBoard.push(newFruit);
+      playPopSound(1);
+
+      setTimeout(function() {
+        if (!gameOver) spawnNextFruit();
+      }, 350);
+    }
+
+    function activateBomb() {
+      if (bombInventory <= 0 || !gameStarted || isPaused || gameOver) return;
+      bombInventory--;
+      playPopSound(8);
+
+      // 清除底部 3 個水果
+      fruitsOnBoard.sort(function(a, b){ return b.y - a.y; });
+      fruitsOnBoard.splice(0, Math.min(3, fruitsOnBoard.length));
+
+      updateUI();
+    }
+
+    // 超穩定輕量化物理更新
+    function updatePhysics() {
+      var gravity = 0.6;
+
+      for (var i = 0; i < fruitsOnBoard.length; i++) {
+        var f = fruitsOnBoard[i];
+        
+        if (f.isDropping) {
+          f.vy += gravity;
+          f.y += f.vy;
+
+          // 觸底停止
+          if (f.y + f.radius >= canvas.height) {
+            f.y = canvas.height - f.radius;
+            f.isDropping = false;
+            f.vy = 0;
+          }
+
+          // 撞擊下方水果停止
+          for (var j = 0; j < fruitsOnBoard.length; j++) {
+            if (i === j) continue;
+            var other = fruitsOnBoard[j];
+            var dx = f.x - other.x;
+            var dy = f.y - other.y;
+            var dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < f.radius + other.radius && f.y < other.y) {
+              f.y = other.y - (f.radius + other.radius);
+              f.isDropping = false;
+              f.vy = 0;
+              break;
+            }
+          }
+        }
+      }
+
+      // 檢查水果碰撞合併
+      for (var i = 0; i < fruitsOnBoard.length; i++) {
+        for (var j = i + 1; j < fruitsOnBoard.length; j++) {
+          var f1 = fruitsOnBoard[i];
+          var f2 = fruitsOnBoard[j];
+
+          if (f1.isMerged || f2.isMerged) continue;
+
+          var dx = f2.x - f1.x;
+          var dy = f2.y - f1.y;
+          var dist = Math.sqrt(dx * dx + dy * dy);
+
+          // 相同水果重疊 ➔ 觸發升級！
+          if (dist < f1.radius + f2.radius + 2 && f1.level === f2.level && f1.level < FRUITS.length - 1) {
+            f1.isMerged = true;
+            f2.isMerged = true;
+
+            var newLevel = f1.level + 1;
+            var newX = (f1.x + f2.x) / 2;
+            var newY = (f1.y + f2.y) / 2;
+
+            score += FRUITS[newLevel].score;
+            playPopSound(newLevel);
+
+            if (newLevel >= 4) bombInventory++; // 獎勵炸彈
+
+            (function(nx, ny, nl) {
+              setTimeout(function() {
+                fruitsOnBoard = fruitsOnBoard.filter(function(item){ return !item.isMerged; });
+                var nf = new FruitItem(nx, ny, nl);
+                nf.isDropping = false;
+                fruitsOnBoard.push(nf);
+                updateUI();
+              }, 30);
+            })(newX, newY, newLevel);
+          }
+        }
+      }
+
+      // 溢出判定
+      for (var k = 0; k < fruitsOnBoard.length; k++) {
+        if (!fruitsOnBoard[k].isDropping && fruitsOnBoard[k].y - fruitsOnBoard[k].radius < 65) {
+          gameOver = true;
+          showOverlay('遊戲結束');
+          break;
+        }
+      }
+    }
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      ctx.strokeStyle = 'rgba(245, 158, 11, 0.3)';
+      ctx.setLineDash([5, 5]);
+      ctx.beginPath();
+      ctx.moveTo(0, 65);
+      ctx.lineTo(canvas.width, 65);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      if (canDrop && gameStarted && !isPaused && !gameOver) {
+        var currentRadius = FRUITS[currentFruitType].radius;
+        ctx.font = (currentRadius * 1.4) + 'px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(FRUITS[currentFruitType].emoji, currentFruitX, 35);
+
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.15)';
+        ctx.beginPath();
+        ctx.moveTo(currentFruitX, 35);
+        ctx.lineTo(currentFruitX, canvas.height);
+        ctx.stroke();
+      }
+
+      for (var i = 0; i < fruitsOnBoard.length; i++) {
+        var f = fruitsOnBoard[i];
+        ctx.font = (f.radius * 1.3) + 'px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(f.emoji, f.x, f.y);
+      }
+    }
+
+    function updateUI() {
+      scoreEl.innerText = score;
+      bombCountHUD.innerText = bombInventory;
+      btnBombText.innerText = '炸彈 (' + bombInventory + ')';
+    }
+
+    function gameLoop() {
+      if (gameStarted && !isPaused && !gameOver) {
+        updatePhysics();
+        draw();
+      }
+      requestAnimationFrame(gameLoop);
+    }
+
+    function handleStartGame() {
+      initAudio();
+      fruitsOnBoard = [];
+      score = 0;
+      bombInventory = 1;
+      gameOver = false;
+      isPaused = false;
+      gameStarted = true;
+      overlay.classList.add('hidden');
+      resizeCanvas();
+      nextFruitType = Math.floor(Math.random() * 3);
+      spawnNextFruit();
+      updateUI();
+    }
+
+    function togglePause() {
+      if (!gameStarted || gameOver) return;
+      isPaused = !isPaused;
+      if (isPaused) {
+        showOverlay('遊戲暫停');
+      } else {
+        overlay.classList.add('hidden');
+      }
+    }
+
+    function showOverlay(title) {
+      overlayTitle.innerText = title;
+      finalScore.innerText = '最終得分: ' + score;
+      if (title !== '水果大合併') finalScore.classList.remove('hidden');
+      startBtn.innerText = title === '遊戲暫停' ? '繼續遊戲' : '開始遊戲';
+      overlay.classList.remove('hidden');
+    }
+
+    function bindButton(elementId, onClickAction, isContinuous) {
+      var btn = document.getElementById(elementId);
+      if (!btn) return;
+      var timer = null;
+      var repeatTimer = null;
+
+      function start(e) {
+        if (e && e.cancelable) e.preventDefault();
+        initAudio();
+        btn.classList.add('active');
+        onClickAction();
+
+        if (isContinuous) {
+          timer = setTimeout(function() {
+            repeatTimer = setInterval(onClickAction, 60);
+          }, 160);
+        }
+      }
+
+      function end(e) {
+        if (e && e.cancelable) e.preventDefault();
+        btn.classList.remove('active');
+        clearTimeout(timer);
+        clearInterval(repeatTimer);
+      }
+
+      btn.addEventListener('touchstart', start, { passive: false });
+      btn.addEventListener('touchend', end);
+      btn.addEventListener('touchcancel', end);
+
+      btn.addEventListener('mousedown', start);
+      btn.addEventListener('mouseup', end);
+      btn.addEventListener('mouseleave', end);
+    }
+
+    bindButton('btnLeft', function(){ moveCurrentFruit(-1); }, true);
+    bindButton('btnRight', function(){ moveCurrentFruit(1); }, true);
+    bindButton('btnDown', function(){ dropFruit(); }, false);
+    bindButton('btnDropRight', function(){ dropFruit(); }, false);
+
+    bindButton('btnPause', function(){ togglePause(); }, false);
+    bindButton('btnRestart', function(){ handleStartGame(); }, false);
+    bindButton('btnBomb', function(){ activateBomb(); }, false);
+
+    startBtn.addEventListener('click', function(e) {
+      e.preventDefault();
+      if (isPaused) togglePause();
+      else handleStartGame();
+    });
+    startBtn.addEventListener('touchend', function(e) {
+      e.preventDefault();
+      if (isPaused) togglePause();
+      else handleStartGame();
+    });
+
+    resizeCanvas();
+    showOverlay('水果大合併');
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
